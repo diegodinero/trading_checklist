@@ -99,6 +99,9 @@ public class TradingChecklist : Indicator
             var settings = base.Settings;
             var defaultSeparator = settings.FirstOrDefault()?.SeparatorGroup;
             settings.Add(new SettingItemFont("Item Font", ItemFont, 100) { SeparatorGroup = defaultSeparator });
+            // Persist checked state as a 15-character binary string (e.g. "101000000000000")
+            string checkedState = new string(_checked.Select(c => c ? '1' : '0').ToArray());
+            settings.Add(new SettingItemString("CheckedState", checkedState, 200) { SeparatorGroup = defaultSeparator });
             return settings;
         }
         set
@@ -106,6 +109,12 @@ public class TradingChecklist : Indicator
             base.Settings = value;
             if (value.TryGetValue("Item Font", out Font fontItem))
                 ItemFont = fontItem;
+            // Restore checked state
+            if (value.TryGetValue("CheckedState", out string checkedState) && checkedState?.Length == 15)
+            {
+                for (int i = 0; i < 15; i++)
+                    _checked[i] = checkedState[i] == '1';
+            }
         }
     }
 
@@ -252,6 +261,7 @@ public class TradingChecklist : Indicator
         {
             for (int i = 0; i < 15; i++)
                 _checked[i] = false;
+            Settings = Settings;
             CurrentChart.RedrawBuffer();
             return;
         }
@@ -262,6 +272,7 @@ public class TradingChecklist : Indicator
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
+                Settings = Settings;
                 CurrentChart.RedrawBuffer();
                 return;
             }
