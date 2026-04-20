@@ -62,6 +62,38 @@ public class TradingChecklist : Indicator
     [InputParameter("Item 15", 14)]
     public string Item15 { get; set; } = "";
 
+    // ── PERSISTED CHECKED STATES ─────────────────────────────────────────────────
+    [InputParameter("Checked State 1", 50)]
+    public bool Checked1 { get; set; } = false;
+    [InputParameter("Checked State 2", 51)]
+    public bool Checked2 { get; set; } = false;
+    [InputParameter("Checked State 3", 52)]
+    public bool Checked3 { get; set; } = false;
+    [InputParameter("Checked State 4", 53)]
+    public bool Checked4 { get; set; } = false;
+    [InputParameter("Checked State 5", 54)]
+    public bool Checked5 { get; set; } = false;
+    [InputParameter("Checked State 6", 55)]
+    public bool Checked6 { get; set; } = false;
+    [InputParameter("Checked State 7", 56)]
+    public bool Checked7 { get; set; } = false;
+    [InputParameter("Checked State 8", 57)]
+    public bool Checked8 { get; set; } = false;
+    [InputParameter("Checked State 9", 58)]
+    public bool Checked9 { get; set; } = false;
+    [InputParameter("Checked State 10", 59)]
+    public bool Checked10 { get; set; } = false;
+    [InputParameter("Checked State 11", 60)]
+    public bool Checked11 { get; set; } = false;
+    [InputParameter("Checked State 12", 61)]
+    public bool Checked12 { get; set; } = false;
+    [InputParameter("Checked State 13", 62)]
+    public bool Checked13 { get; set; } = false;
+    [InputParameter("Checked State 14", 63)]
+    public bool Checked14 { get; set; } = false;
+    [InputParameter("Checked State 15", 64)]
+    public bool Checked15 { get; set; } = false;
+
     // ── POSITION SETTINGS ────────────────────────────────────────────────────────
     [InputParameter("X Offset", 15)]
     public int XShift { get; set; } = 20;
@@ -162,38 +194,99 @@ public class TradingChecklist : Indicator
     protected override void OnInit()
     {
         base.OnInit();
+        LoadCheckedStates(); // Re-enable persistence
         LayoutUI();
-        CurrentChart.MouseClick += OnChartMouseClick;
+        if (CurrentChart != null)
+            CurrentChart.MouseClick += OnChartMouseClick;
     }
 
     protected override void OnSettingsUpdated()
     {
+        base.OnSettingsUpdated();
+        LoadCheckedStates(); // Re-enable persistence
         LayoutUI();
+        CurrentChart?.RedrawBuffer();
     }
 
     public override void Dispose()
     {
-        CurrentChart.MouseClick -= OnChartMouseClick;
+        if (CurrentChart != null)
+            CurrentChart.MouseClick -= OnChartMouseClick;
 
-        // Dispose managed font and format resources
-        _titleFont.Dispose();
-        _countFont.Dispose();
-        _resetFont.Dispose();
-        ItemFont?.Dispose();
-        CenterFormat.Dispose();
-        LeftFormat.Dispose();
-        RightFormat.Dispose();
+        // Don't dispose fonts - let GC handle them to avoid refresh issues
+        // The fonts are readonly fields and disposing them breaks refresh
 
         base.Dispose();
     }
 
     // ── HELPERS ──────────────────────────────────────────────────────────────────
-    private string[] GetItems() => new[]
+    private string[] GetItems()
     {
-        Item1, Item2, Item3, Item4, Item5,
-        Item6, Item7, Item8, Item9, Item10,
-        Item11, Item12, Item13, Item14, Item15
-    };
+        // Return actual InputParameter values without forced fallbacks
+        // This allows dynamic show/hide to work properly
+        return new string[]
+        {
+            Item1 ?? "",
+            Item2 ?? "",
+            Item3 ?? "",
+            Item4 ?? "",
+            Item5 ?? "",
+            Item6 ?? "",
+            Item7 ?? "",
+            Item8 ?? "",
+            Item9 ?? "",
+            Item10 ?? "",
+            Item11 ?? "",
+            Item12 ?? "",
+            Item13 ?? "",
+            Item14 ?? "",
+            Item15 ?? ""
+        };
+    }
+
+    /// <summary>
+    /// Load checked states from InputParameters to maintain state across chart refreshes
+    /// </summary>
+    private void LoadCheckedStates()
+    {
+        _checked[0] = Checked1;
+        _checked[1] = Checked2;
+        _checked[2] = Checked3;
+        _checked[3] = Checked4;
+        _checked[4] = Checked5;
+        _checked[5] = Checked6;
+        _checked[6] = Checked7;
+        _checked[7] = Checked8;
+        _checked[8] = Checked9;
+        _checked[9] = Checked10;
+        _checked[10] = Checked11;
+        _checked[11] = Checked12;
+        _checked[12] = Checked13;
+        _checked[13] = Checked14;
+        _checked[14] = Checked15;
+    }
+
+    /// <summary>
+    /// Save checked states to InputParameters for persistence across chart refreshes
+    /// </summary>
+    private void SaveCheckedStates()
+    {
+        Checked1 = _checked[0];
+        Checked2 = _checked[1];
+        Checked3 = _checked[2];
+        Checked4 = _checked[3];
+        Checked5 = _checked[4];
+        Checked6 = _checked[5];
+        Checked7 = _checked[6];
+        Checked8 = _checked[7];
+        Checked9 = _checked[8];
+        Checked10 = _checked[9];
+        Checked11 = _checked[10];
+        Checked12 = _checked[11];
+        Checked13 = _checked[12];
+        Checked14 = _checked[13];
+        Checked15 = _checked[14];
+    }
 
     /// <summary>
     /// Recalculates all layout rectangles based on current settings.
@@ -203,12 +296,21 @@ public class TradingChecklist : Indicator
     {
         _panelW = Math.Max(150, Math.Min(PanelWidth, 600));
 
-        var items = GetItems();
-        _visibleItemCount = items.Count(s => !string.IsNullOrWhiteSpace(s));
-
         int X = XShift;
         int Y = YShift;
 
+        var items = GetItems();
+
+        // Count visible items (non-empty)
+        int visibleCount = 0;
+        for (int i = 0; i < 15; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(items[i]))
+                visibleCount++;
+        }
+        _visibleItemCount = visibleCount;
+
+        // Create layout only for items that have content
         int idx = 0;
         for (int i = 0; i < 15; i++)
         {
@@ -252,7 +354,8 @@ public class TradingChecklist : Indicator
         {
             for (int i = 0; i < 15; i++)
                 _checked[i] = false;
-            CurrentChart.RedrawBuffer();
+            SaveCheckedStates(); // Re-enable persistence
+            CurrentChart?.RedrawBuffer();
             return;
         }
 
@@ -262,7 +365,8 @@ public class TradingChecklist : Indicator
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
-                CurrentChart.RedrawBuffer();
+                SaveCheckedStates(); // Re-enable persistence
+                CurrentChart?.RedrawBuffer();
                 return;
             }
         }
@@ -324,12 +428,13 @@ public class TradingChecklist : Indicator
 
         // ── Checklist rows ───────────────────────────────────────────────────────
         int idx = 0;
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < 15; i++) // Restore to 15 items with filtering
         {
+            // Skip empty items to match layout
             if (string.IsNullOrWhiteSpace(items[i]))
                 continue;
 
-            int rowY = Y + HeaderH + idx * ItemH;
+            int rowY = Y + HeaderH + idx * ItemH; // Use idx for correct positioning
             bool isChecked = _checked[i];
 
             // Row highlight when checked
@@ -364,18 +469,22 @@ public class TradingChecklist : Indicator
                 }
             }
 
-            // Item text (dimmed when checked)
+            // Item text (dimmed when checked) - Add extra safety check
+            string itemText = items[i] ?? $"Item {i + 1}"; // Fallback text if still null
             Color textColor = isChecked
                 ? Color.FromArgb(140, ItemTextColor.R, ItemTextColor.G, ItemTextColor.B)
                 : ItemTextColor;
 
             using (var textBrush = new SolidBrush(textColor))
-                g.DrawString(items[i], ItemFont, textBrush,
+            {
+                Font fontToUse = ItemFont ?? new Font("Arial", 10);
+                g.DrawString(itemText, fontToUse, textBrush,
                     X + Gutter + CheckSize + Gutter,
                     rowY + ItemH / 2f,
                     LeftFormat);
+            }
 
-            idx++;
+            idx++; // Increment index for next visible row
         }
 
         // ── Reset All button ─────────────────────────────────────────────────────
