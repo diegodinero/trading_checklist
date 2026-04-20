@@ -182,20 +182,19 @@ public class TradingChecklist : Indicator
     protected override void OnInit()
     {
         base.OnInit();
-        // BuildBrushesAndPens is called explicitly here because the Indicator base
-        // class may not call it automatically (unlike OrderPlacingTool). This
-        // guarantees all brush/pen fields are ready before the first OnPaintChart.
-        BuildBrushesAndPens();
+        // Initialize all GDI brush/pen resources before the first OnPaintChart call.
+        InitBrushesAndPens();
         LayoutUI();
         CurrentChart.MouseClick += OnChartMouseClick;
     }
 
     protected override void OnSettingsUpdated()
     {
+        InitBrushesAndPens();
         LayoutUI();
     }
 
-    protected override void BuildBrushesAndPens()
+    private void InitBrushesAndPens()
     {
         // Dispose previous cached resources before rebuilding
         DisposeBrushesAndPens();
@@ -221,9 +220,8 @@ public class TradingChecklist : Indicator
 
         // Load checked state. Symbol may be null the very first time this is
         // called from OnInit(), in which case GetStateFilePath() falls back to
-        // "default". The framework may call BuildBrushesAndPens() again later
-        // (e.g. when a color InputParameter changes) at which point Symbol will
-        // be set and the correct per-symbol file will be loaded.
+        // "default". On subsequent calls (e.g. when a color setting changes)
+        // Symbol will be set and the correct per-symbol file will be loaded.
         LoadState();
     }
 
