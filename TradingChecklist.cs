@@ -182,7 +182,10 @@ public class TradingChecklist : Indicator
     protected override void OnInit()
     {
         base.OnInit();
-        LoadState();
+        // BuildBrushesAndPens is called explicitly here because the Indicator base
+        // class may not call it automatically (unlike OrderPlacingTool). This
+        // guarantees all brush/pen fields are ready before the first OnPaintChart.
+        BuildBrushesAndPens();
         LayoutUI();
         CurrentChart.MouseClick += OnChartMouseClick;
     }
@@ -216,8 +219,11 @@ public class TradingChecklist : Indicator
         _cbCheckedPen     = new Pen(CheckedColor);
         _checkmarkPen     = new Pen(Color.White, 2f) { LineJoin = LineJoin.Round };
 
-        // Reload checked state here — Symbol is guaranteed to be available at this
-        // point, whereas it may still be null during OnInit().
+        // Load checked state. Symbol may be null the very first time this is
+        // called from OnInit(), in which case GetStateFilePath() falls back to
+        // "default". The framework may call BuildBrushesAndPens() again later
+        // (e.g. when a color InputParameter changes) at which point Symbol will
+        // be set and the correct per-symbol file will be loaded.
         LoadState();
     }
 
@@ -382,9 +388,6 @@ public class TradingChecklist : Indicator
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         base.OnPaintChart(args);
-
-        // Guard: cached resources may not be ready on the very first paint call
-        if (_panelBrush == null) return;
 
         var g = args.Graphics;
         float s = (float)UIScale;
