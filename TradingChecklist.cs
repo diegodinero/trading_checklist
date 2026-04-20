@@ -252,7 +252,7 @@ public class TradingChecklist : Indicator
         {
             for (int i = 0; i < 15; i++)
                 _checked[i] = false;
-            CurrentChart.Invalidate();
+            this.Recalculate();
             return;
         }
 
@@ -262,7 +262,7 @@ public class TradingChecklist : Indicator
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
-                CurrentChart.Invalidate();
+                this.Recalculate();
                 return;
             }
         }
