@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Linq;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Chart;
@@ -99,9 +100,6 @@ public class TradingChecklist : Indicator
             var settings = base.Settings;
             var defaultSeparator = settings.FirstOrDefault()?.SeparatorGroup;
             settings.Add(new SettingItemFont("Item Font", ItemFont, 100) { SeparatorGroup = defaultSeparator });
-            // Persist checked state as a 15-character binary string (e.g. "101000000000000")
-            string checkedState = new string(_checked.Select(c => c ? '1' : '0').ToArray());
-            settings.Add(new SettingItemString("CheckedState", checkedState, 200) { SeparatorGroup = defaultSeparator });
             return settings;
         }
         set
@@ -109,12 +107,6 @@ public class TradingChecklist : Indicator
             base.Settings = value;
             if (value.TryGetValue("Item Font", out Font fontItem))
                 ItemFont = fontItem;
-            // Restore checked state
-            if (value.TryGetValue("CheckedState", out string checkedState) && checkedState?.Length == 15)
-            {
-                for (int i = 0; i < 15; i++)
-                    _checked[i] = checkedState[i] == '1';
-            }
         }
     }
 
@@ -171,6 +163,7 @@ public class TradingChecklist : Indicator
     protected override void OnInit()
     {
         base.OnInit();
+        LoadState();
         LayoutUI();
         CurrentChart.MouseClick += OnChartMouseClick;
     }
@@ -247,6 +240,41 @@ public class TradingChecklist : Indicator
         _panelRect = new RectangleF(X - 4, Y - 4, _panelW + 8, totalH + 8);
     }
 
+    // ── STATE PERSISTENCE ────────────────────────────────────────────────────────
+    private string GetStateFilePath()
+    {
+        string dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "TradingChecklist");
+        Directory.CreateDirectory(dir);
+        string safeSymbol = (Symbol?.Name ?? "default").Replace("/", "_").Replace("\\", "_");
+        return Path.Combine(dir, $"state_{safeSymbol}.txt");
+    }
+
+    private void SaveState()
+    {
+        try
+        {
+            File.WriteAllText(GetStateFilePath(),
+                new string(_checked.Select(c => c ? '1' : '0').ToArray()));
+        }
+        catch { }
+    }
+
+    private void LoadState()
+    {
+        try
+        {
+            string path = GetStateFilePath();
+            if (!File.Exists(path)) return;
+            string content = File.ReadAllText(path).Trim();
+            if (content.Length == 15)
+                for (int i = 0; i < 15; i++)
+                    _checked[i] = content[i] == '1';
+        }
+        catch { }
+    }
+
     // ── MOUSE CLICK HANDLER ──────────────────────────────────────────────────────
     private void OnChartMouseClick(object sender, ChartMouseNativeEventArgs e)
     {
@@ -261,7 +289,7 @@ public class TradingChecklist : Indicator
         {
             for (int i = 0; i < 15; i++)
                 _checked[i] = false;
-            Settings = Settings;
+            SaveState();
             CurrentChart.RedrawBuffer();
             return;
         }
@@ -272,7 +300,7 @@ public class TradingChecklist : Indicator
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
-                Settings = Settings;
+                SaveState();
                 CurrentChart.RedrawBuffer();
                 return;
             }
