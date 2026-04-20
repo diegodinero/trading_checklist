@@ -120,8 +120,27 @@ public class TradingChecklist : Indicator
 
     // ── FONTS ────────────────────────────────────────────────────────────────────
     private readonly Font _titleFont = new Font("Segoe UI", 12, FontStyle.Bold);
-    private readonly Font _countFont = new Font("Segoe UI", 9, FontStyle.Regular);
+    private readonly Font _countFont = new Font("Segoe UI", 9,  FontStyle.Regular);
     private readonly Font _resetFont = new Font("Segoe UI", 10, FontStyle.Regular);
+
+    // ── CACHED BRUSHES & PENS (rebuilt in BuildBrushesAndPens) ───────────────────
+    private SolidBrush _panelBrush;
+    private SolidBrush _headerBrush;
+    private SolidBrush _titleBrush;
+    private SolidBrush _countBrush;
+    private SolidBrush _rowHighlightBrush;
+    private SolidBrush _cbUncheckedBrush;
+    private SolidBrush _cbCheckedBrush;
+    private SolidBrush _resetButtonBrush;
+    private SolidBrush _resetTextBrush;
+    private SolidBrush _textUncheckedBrush;
+    private SolidBrush _textCheckedBrush;
+    private Pen        _borderPen;
+    private Pen        _headerDividerPen;
+    private Pen        _rowDividerPen;
+    private Pen        _cbUncheckedPen;
+    private Pen        _cbCheckedPen;
+    private Pen        _checkmarkPen;
 
     // ── STRING FORMATS ───────────────────────────────────────────────────────────
     private readonly StringFormat CenterFormat = new StringFormat
@@ -173,11 +192,61 @@ public class TradingChecklist : Indicator
         LayoutUI();
     }
 
+    protected override void BuildBrushesAndPens()
+    {
+        // Dispose previous cached resources before rebuilding
+        DisposeBrushesAndPens();
+
+        _panelBrush        = new SolidBrush(Color.FromArgb(20, 30, 40));
+        _headerBrush       = new SolidBrush(Color.FromArgb(41, 50, 60));
+        _titleBrush        = new SolidBrush(TitleColor);
+        _countBrush        = new SolidBrush(Color.FromArgb(184, 205, 228));
+        _rowHighlightBrush = new SolidBrush(Color.FromArgb(30, CheckedColor.R, CheckedColor.G, CheckedColor.B));
+        _cbUncheckedBrush  = new SolidBrush(Color.FromArgb(41, 50, 60));
+        _cbCheckedBrush    = new SolidBrush(CheckedColor);
+        _resetButtonBrush  = new SolidBrush(Color.FromArgb(41, 50, 60));
+        _resetTextBrush    = new SolidBrush(Color.FromArgb(184, 205, 228));
+        _textUncheckedBrush = new SolidBrush(ItemTextColor);
+        _textCheckedBrush  = new SolidBrush(Color.FromArgb(140, ItemTextColor.R, ItemTextColor.G, ItemTextColor.B));
+
+        _borderPen        = new Pen(Color.Gray);
+        _headerDividerPen = new Pen(Color.FromArgb(80, 150, 150, 150));
+        _rowDividerPen    = new Pen(Color.FromArgb(40, 150, 150, 150));
+        _cbUncheckedPen   = new Pen(Color.Gray);
+        _cbCheckedPen     = new Pen(CheckedColor);
+        _checkmarkPen     = new Pen(Color.White, 2f) { LineJoin = LineJoin.Round };
+
+        // Reload checked state here — Symbol is guaranteed to be available at this
+        // point, whereas it may still be null during OnInit().
+        LoadState();
+    }
+
+    private void DisposeBrushesAndPens()
+    {
+        _panelBrush?.Dispose();        _panelBrush        = null;
+        _headerBrush?.Dispose();       _headerBrush       = null;
+        _titleBrush?.Dispose();        _titleBrush        = null;
+        _countBrush?.Dispose();        _countBrush        = null;
+        _rowHighlightBrush?.Dispose(); _rowHighlightBrush = null;
+        _cbUncheckedBrush?.Dispose();  _cbUncheckedBrush  = null;
+        _cbCheckedBrush?.Dispose();    _cbCheckedBrush    = null;
+        _resetButtonBrush?.Dispose();  _resetButtonBrush  = null;
+        _resetTextBrush?.Dispose();    _resetTextBrush    = null;
+        _textUncheckedBrush?.Dispose(); _textUncheckedBrush = null;
+        _textCheckedBrush?.Dispose();  _textCheckedBrush  = null;
+        _borderPen?.Dispose();        _borderPen        = null;
+        _headerDividerPen?.Dispose(); _headerDividerPen = null;
+        _rowDividerPen?.Dispose();    _rowDividerPen    = null;
+        _cbUncheckedPen?.Dispose();   _cbUncheckedPen   = null;
+        _cbCheckedPen?.Dispose();     _cbCheckedPen     = null;
+        _checkmarkPen?.Dispose();     _checkmarkPen     = null;
+    }
+
     public override void Dispose()
     {
         CurrentChart.MouseClick -= OnChartMouseClick;
 
-        // Dispose managed font and format resources
+        // Dispose fonts and string formats
         _titleFont.Dispose();
         _countFont.Dispose();
         _resetFont.Dispose();
@@ -185,6 +254,8 @@ public class TradingChecklist : Indicator
         CenterFormat.Dispose();
         LeftFormat.Dispose();
         RightFormat.Dispose();
+
+        DisposeBrushesAndPens();
 
         base.Dispose();
     }
@@ -312,6 +383,9 @@ public class TradingChecklist : Indicator
     {
         base.OnPaintChart(args);
 
+        // Guard: cached resources may not be ready on the very first paint call
+        if (_panelBrush == null) return;
+
         var g = args.Graphics;
         float s = (float)UIScale;
         var savedState = g.Save();
@@ -325,30 +399,21 @@ public class TradingChecklist : Indicator
         using (var path = RoundedRect(_panelRect, BtnRadius))
         {
             if (!TransparentBackground)
-            {
-                using (var br = new SolidBrush(Color.FromArgb(20, 30, 40)))
-                    g.FillPath(br, path);
-            }
-            using (var pen = new Pen(Color.Gray))
-                g.DrawPath(pen, path);
+                g.FillPath(_panelBrush, path);
+            g.DrawPath(_borderPen, path);
         }
 
         // ── Header bar ───────────────────────────────────────────────────────────
         var hdrRect = new Rectangle(X, Y, _panelW, HeaderH);
         if (!TransparentBackground)
-        {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
-                g.FillRectangle(br, hdrRect);
-        }
+            g.FillRectangle(_headerBrush, hdrRect);
 
         // Divider line under header
-        using (var divPen = new Pen(Color.FromArgb(80, 150, 150, 150)))
-            g.DrawLine(divPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
+        g.DrawLine(_headerDividerPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
 
         // Title text
-        using (var titleBrush = new SolidBrush(TitleColor))
-            g.DrawString("Trading Checklist", _titleFont, titleBrush,
-                X + _panelW / 2f, Y + HeaderH / 2f, CenterFormat);
+        g.DrawString("Trading Checklist", _titleFont, _titleBrush,
+            X + _panelW / 2f, Y + HeaderH / 2f, CenterFormat);
 
         // Checked count (e.g. "3/10") in top-right of header
         int checkedCount = 0;
@@ -356,10 +421,8 @@ public class TradingChecklist : Indicator
             if (_checked[i] && !string.IsNullOrWhiteSpace(items[i]))
                 checkedCount++;
 
-        string countStr = $"{checkedCount}/{_visibleItemCount}";
-        using (var countBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
-            g.DrawString(countStr, _countFont, countBrush,
-                X + _panelW - Gutter, Y + HeaderH / 2f, RightFormat);
+        g.DrawString($"{checkedCount}/{_visibleItemCount}", _countFont, _countBrush,
+            X + _panelW - Gutter, Y + HeaderH / 2f, RightFormat);
 
         // ── Checklist rows ───────────────────────────────────────────────────────
         int idx = 0;
@@ -373,46 +436,30 @@ public class TradingChecklist : Indicator
 
             // Row highlight when checked
             if (isChecked)
-            {
-                using (var rowBr = new SolidBrush(Color.FromArgb(30, CheckedColor.R, CheckedColor.G, CheckedColor.B)))
-                    g.FillRectangle(rowBr, X, rowY, _panelW, ItemH);
-            }
+                g.FillRectangle(_rowHighlightBrush, X, rowY, _panelW, ItemH);
 
             // Row divider
-            using (var divPen = new Pen(Color.FromArgb(40, 150, 150, 150)))
-                g.DrawLine(divPen, X + Gutter, rowY, X + _panelW - Gutter, rowY);
+            g.DrawLine(_rowDividerPen, X + Gutter, rowY, X + _panelW - Gutter, rowY);
 
             // Checkbox background
             var cbRect = new Rectangle(X + Gutter, rowY + (ItemH - CheckSize) / 2, CheckSize, CheckSize);
-            using (var cbFill = new SolidBrush(isChecked ? CheckedColor : Color.FromArgb(41, 50, 60)))
-                g.FillRectangle(cbFill, cbRect);
-            using (var cbPen = new Pen(isChecked ? CheckedColor : Color.Gray))
-                g.DrawRectangle(cbPen, cbRect);
+            g.FillRectangle(isChecked ? _cbCheckedBrush : _cbUncheckedBrush, cbRect);
+            g.DrawRectangle(isChecked ? _cbCheckedPen : _cbUncheckedPen, cbRect);
 
             // Checkmark (✓) when checked
             if (isChecked)
             {
-                using (var chkPen = new Pen(Color.White, 2f) { LineJoin = LineJoin.Round })
-                {
-                    g.DrawLine(chkPen,
-                        cbRect.X + 2,               cbRect.Y + cbRect.Height / 2,
-                        cbRect.X + cbRect.Width / 2, cbRect.Y + cbRect.Height - 3);
-                    g.DrawLine(chkPen,
-                        cbRect.X + cbRect.Width / 2, cbRect.Y + cbRect.Height - 3,
-                        cbRect.X + cbRect.Width - 2, cbRect.Y + 3);
-                }
+                g.DrawLine(_checkmarkPen,
+                    cbRect.X + 2,               cbRect.Y + cbRect.Height / 2,
+                    cbRect.X + cbRect.Width / 2, cbRect.Y + cbRect.Height - 3);
+                g.DrawLine(_checkmarkPen,
+                    cbRect.X + cbRect.Width / 2, cbRect.Y + cbRect.Height - 3,
+                    cbRect.X + cbRect.Width - 2, cbRect.Y + 3);
             }
 
             // Item text (dimmed when checked)
-            Color textColor = isChecked
-                ? Color.FromArgb(140, ItemTextColor.R, ItemTextColor.G, ItemTextColor.B)
-                : ItemTextColor;
-
-            using (var textBrush = new SolidBrush(textColor))
-                g.DrawString(items[i], ItemFont, textBrush,
-                    X + Gutter + CheckSize + Gutter,
-                    rowY + ItemH / 2f,
-                    LeftFormat);
+            g.DrawString(items[i], ItemFont, isChecked ? _textCheckedBrush : _textUncheckedBrush,
+                X + Gutter + CheckSize + Gutter, rowY + ItemH / 2f, LeftFormat);
 
             idx++;
         }
@@ -422,16 +469,13 @@ public class TradingChecklist : Indicator
                                          _resetBtnRect.Width, _resetBtnRect.Height);
         using (var path = RoundedRect(resetRectF, BtnRadius))
         {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
-                g.FillPath(br, path);
-            using (var pen = new Pen(Color.Gray))
-                g.DrawPath(pen, path);
+            g.FillPath(_resetButtonBrush, path);
+            g.DrawPath(_borderPen, path);
         }
-        using (var resetBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
-            g.DrawString("Reset All", _resetFont, resetBrush,
-                _resetBtnRect.X + _resetBtnRect.Width / 2f,
-                _resetBtnRect.Y + _resetBtnRect.Height / 2f,
-                CenterFormat);
+        g.DrawString("Reset All", _resetFont, _resetTextBrush,
+            _resetBtnRect.X + _resetBtnRect.Width / 2f,
+            _resetBtnRect.Y + _resetBtnRect.Height / 2f,
+            CenterFormat);
 
         g.Restore(savedState);
     }
