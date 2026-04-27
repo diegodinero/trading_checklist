@@ -382,6 +382,11 @@ public class TradingChecklist : Indicator
             _dragOffsetY = y - YShift;
             e.Handled    = true;
         }
+        else
+        {
+            // Reset in case the drag state got stuck (e.g. mouse released outside the chart).
+            _isDragging = false;
+        }
     }
 
     // MouseMove: live-move the panel while the user is dragging.
@@ -390,6 +395,14 @@ public class TradingChecklist : Indicator
         if (!_isDragging) return;
 
         var ne = (NativeMouseEventArgs)e;
+
+        // If the left button is no longer held (e.g. released outside the chart window),
+        // cancel the drag so the panel stops moving and clicks work again.
+        if (ne.Button != NativeMouseButtons.Left)
+        {
+            _isDragging = false;
+            return;
+        }
         int x = (int)(ne.X / UIScale);
         int y = (int)(ne.Y / UIScale);
 
