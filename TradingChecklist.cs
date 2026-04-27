@@ -527,7 +527,7 @@ public class TradingChecklist : Indicator
                 checkedCount++;
 
         string countStr = $"{checkedCount}/{_visibleItemCount}";
-        using (var countBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
+        using (var countBrush = new SolidBrush(TitleColor))
             g.DrawString(countStr, _countFont, countBrush,
                 X + _panelW - Gutter, Y + HeaderH / 2f, RightFormat);
 
@@ -605,7 +605,7 @@ public class TradingChecklist : Indicator
             using (var pen = new Pen(AccentColor))
                 g.DrawPath(pen, path);
         }
-        using (var resetBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
+        using (var resetBrush = new SolidBrush(TitleColor))
             g.DrawString("Reset All", _resetFont, resetBrush,
                 _resetBtnRect.X + _resetBtnRect.Width / 2f,
                 _resetBtnRect.Y + _resetBtnRect.Height / 2f,
