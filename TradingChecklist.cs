@@ -174,12 +174,11 @@ public class TradingChecklist : Indicator
     // ── RUNTIME STATE ────────────────────────────────────────────────────────────
     private readonly bool[] _checked = new bool[15];
 
-    // ── DRAG STATE ───────────────────────────────────────────────────────────────
-    private bool _isDragging;
-    private int _dragStartMouseX;
-    private int _dragStartMouseY;
-    private int _dragStartXShift;
-    private int _dragStartYShift;
+    // ── MOVE STATE ───────────────────────────────────────────────────────────────
+    // Repositioning uses two clicks: click header to "grab", click anywhere to "place".
+    private bool _isMoving;
+    private int _movePickupOffsetX;   // cursor offset from panel left edge when grabbed
+    private int _movePickupOffsetY;   // cursor offset from panel top  edge when grabbed
 
     // ── CACHED LAYOUT RECTS ──────────────────────────────────────────────────────
     private int _panelW;
@@ -204,12 +203,7 @@ public class TradingChecklist : Indicator
         LoadCheckedStates(); // Re-enable persistence
         LayoutUI();
         if (CurrentChart != null)
-        {
             CurrentChart.MouseClick += OnChartMouseClick;
-            CurrentChart.MouseDown  += OnChartMouseDown;
-            CurrentChart.MouseMove  += OnChartMouseMove;
-            CurrentChart.MouseUp    += OnChartMouseUp;
-        }
     }
 
     protected override void OnSettingsUpdated()
@@ -223,12 +217,7 @@ public class TradingChecklist : Indicator
     public override void Dispose()
     {
         if (CurrentChart != null)
-        {
             CurrentChart.MouseClick -= OnChartMouseClick;
-            CurrentChart.MouseDown  -= OnChartMouseDown;
-            CurrentChart.MouseMove  -= OnChartMouseMove;
-            CurrentChart.MouseUp    -= OnChartMouseUp;
-        }
 
         // Don't dispose fonts - let GC handle them to avoid refresh issues
         // The fonts are readonly fields and disposing them breaks refresh
@@ -366,64 +355,58 @@ public class TradingChecklist : Indicator
         int x = (int)(ne.X / UIScale);
         int y = (int)(ne.Y / UIScale);
 
-        // Reset All button
-        if (_resetBtnRect.Contains(x, y))
+        var headerRect = new Rectangle(XShift, YShift, _panelW, HeaderH);
+
+        // ── Move-mode active: the next click anywhere places the panel ────────────
+        if (_isMoving)
         {
-            for (int i = 0; i < 15; i++)
-                _checked[i] = false;
-            SaveCheckedStates(); // Re-enable persistence
+            // If the user clicks the header again, cancel the move instead of placing
+            if (headerRect.Contains(x, y))
+            {
+                _isMoving = false;
+                CurrentChart?.RedrawBuffer();
+                return;
+            }
+            // Place panel so the grabbed offset is preserved under the cursor
+            XShift = Math.Max(0, x - _movePickupOffsetX);
+            YShift = Math.Max(0, y - _movePickupOffsetY);
+            _isMoving = false;
+            LayoutUI();
             CurrentChart?.RedrawBuffer();
             return;
         }
 
-        // Toggle items: clicking anywhere on the row (including the checkbox) toggles it.
+        // ── Header clicked: enter move mode ──────────────────────────────────────
+        if (headerRect.Contains(x, y))
+        {
+            _isMoving          = true;
+            _movePickupOffsetX = x - XShift;
+            _movePickupOffsetY = y - YShift;
+            CurrentChart?.RedrawBuffer();
+            return;
+        }
+
+        // ── Reset All button ──────────────────────────────────────────────────────
+        if (_resetBtnRect.Contains(x, y))
+        {
+            for (int i = 0; i < 15; i++)
+                _checked[i] = false;
+            SaveCheckedStates();
+            CurrentChart?.RedrawBuffer();
+            return;
+        }
+
+        // ── Toggle checklist items ────────────────────────────────────────────────
         for (int i = 0; i < 15; i++)
         {
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
-                SaveCheckedStates(); // Re-enable persistence
+                SaveCheckedStates();
                 CurrentChart?.RedrawBuffer();
                 return;
             }
         }
-    }
-
-    // ── DRAG HANDLERS ────────────────────────────────────────────────────────────
-    private void OnChartMouseDown(object sender, ChartMouseNativeEventArgs e)
-    {
-        var ne = (NativeMouseEventArgs)e;
-        int x = (int)(ne.X / UIScale);
-        int y = (int)(ne.Y / UIScale);
-
-        var headerRect = new Rectangle(XShift, YShift, _panelW, HeaderH);
-        if (headerRect.Contains(x, y))
-        {
-            _isDragging      = true;
-            _dragStartMouseX = x;
-            _dragStartMouseY = y;
-            _dragStartXShift = XShift;
-            _dragStartYShift = YShift;
-        }
-    }
-
-    private void OnChartMouseMove(object sender, ChartMouseNativeEventArgs e)
-    {
-        if (!_isDragging) return;
-
-        var ne = (NativeMouseEventArgs)e;
-        int x = (int)(ne.X / UIScale);
-        int y = (int)(ne.Y / UIScale);
-
-        XShift = Math.Max(0, _dragStartXShift + (x - _dragStartMouseX));
-        YShift = Math.Max(0, _dragStartYShift + (y - _dragStartMouseY));
-        LayoutUI();
-        CurrentChart?.RedrawBuffer();
-    }
-
-    private void OnChartMouseUp(object sender, ChartMouseNativeEventArgs e)
-    {
-        _isDragging = false;
     }
 
     // ── PAINT ────────────────────────────────────────────────────────────────────
@@ -454,9 +437,13 @@ public class TradingChecklist : Indicator
 
         // ── Header bar ───────────────────────────────────────────────────────────
         var hdrRect = new Rectangle(X, Y, _panelW, HeaderH);
-        if (!TransparentBackground)
+        if (!TransparentBackground || _isMoving)
         {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
+            // Highlight header when in move mode so the user gets clear visual feedback
+            Color hdrColor = _isMoving
+                ? Color.FromArgb(35, 90, 120)   // blue tint = "grabbed"
+                : Color.FromArgb(41, 50, 60);
+            using (var br = new SolidBrush(hdrColor))
                 g.FillRectangle(br, hdrRect);
         }
 
@@ -464,8 +451,11 @@ public class TradingChecklist : Indicator
         using (var divPen = new Pen(Color.FromArgb(80, 150, 150, 150)))
             g.DrawLine(divPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
 
-        // Drag handle indicator (3 rows × 2 columns of small dots) at the left of the header
-        using (var dotBrush = new SolidBrush(Color.FromArgb(120, 180, 180, 180)))
+        // Move handle indicator (3 rows × 2 columns of small dots) at the left of the header
+        Color dotColor = _isMoving
+            ? Color.FromArgb(200, 100, 200, 255)  // bright blue when grabbed
+            : Color.FromArgb(120, 180, 180, 180);
+        using (var dotBrush = new SolidBrush(dotColor))
         {
             const int dotSize = 2;
             const int dotGap  = 3;
@@ -479,9 +469,10 @@ public class TradingChecklist : Indicator
                         dotSize, dotSize);
         }
 
-        // Title text
+        // Title text — append a hint when in move mode
+        string titleText = _isMoving ? "Click to place…" : "Trading Checklist";
         using (var titleBrush = new SolidBrush(TitleColor))
-            g.DrawString("Trading Checklist", _titleFont, titleBrush,
+            g.DrawString(titleText, _titleFont, titleBrush,
                 X + _panelW / 2f, Y + HeaderH / 2f, CenterFormat);
 
         // Checked count (e.g. "3/10") in top-right of header
