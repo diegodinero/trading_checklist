@@ -174,6 +174,12 @@ public class TradingChecklist : Indicator
     // ── RUNTIME STATE ────────────────────────────────────────────────────────────
     private readonly bool[] _checked = new bool[15];
 
+    // ── DRAG STATE ───────────────────────────────────────────────────────────────
+    // True while the user is holding the mouse button on the header and dragging.
+    private bool _isDragging;
+    private int _dragOffsetX;   // cursor X offset from panel left edge when drag started
+    private int _dragOffsetY;   // cursor Y offset from panel top  edge when drag started
+
     // ── CACHED LAYOUT RECTS ──────────────────────────────────────────────────────
     private int _panelW;
     private int _visibleItemCount;
@@ -197,7 +203,12 @@ public class TradingChecklist : Indicator
         LoadCheckedStates(); // Re-enable persistence
         LayoutUI();
         if (CurrentChart != null)
+        {
             CurrentChart.MouseClick += OnChartMouseClick;
+            CurrentChart.MouseDown  += OnChartMouseDown;
+            CurrentChart.MouseMove  += OnChartMouseMove;
+            CurrentChart.MouseUp    += OnChartMouseUp;
+        }
     }
 
     protected override void OnSettingsUpdated()
@@ -211,7 +222,12 @@ public class TradingChecklist : Indicator
     public override void Dispose()
     {
         if (CurrentChart != null)
+        {
             CurrentChart.MouseClick -= OnChartMouseClick;
+            CurrentChart.MouseDown  -= OnChartMouseDown;
+            CurrentChart.MouseMove  -= OnChartMouseMove;
+            CurrentChart.MouseUp    -= OnChartMouseUp;
+        }
 
         // Don't dispose fonts - let GC handle them to avoid refresh issues
         // The fonts are readonly fields and disposing them breaks refresh
@@ -340,7 +356,68 @@ public class TradingChecklist : Indicator
         _panelRect = new RectangleF(X - 4, Y - 4, _panelW + 8, totalH + 8);
     }
 
-    // ── MOUSE CLICK HANDLER ──────────────────────────────────────────────────────
+    // ── MOUSE HANDLERS ───────────────────────────────────────────────────────────
+
+    // MouseDown: start a drag when the user presses on the header.
+    // Setting e.Handled = true prevents the chart from treating the drag as a pan.
+    private void OnChartMouseDown(object sender, ChartMouseNativeEventArgs e)
+    {
+        var ne = (NativeMouseEventArgs)e;
+        if (ne.Button != NativeMouseButtons.Left) return;
+
+        int x = (int)(ne.X / UIScale);
+        int y = (int)(ne.Y / UIScale);
+
+        var headerRect = new Rectangle(XShift, YShift, _panelW, HeaderH);
+        if (headerRect.Contains(x, y))
+        {
+            _isDragging  = true;
+            _dragOffsetX = x - XShift;
+            _dragOffsetY = y - YShift;
+            e.Handled    = true;
+        }
+    }
+
+    // MouseMove: live-move the panel while the user is dragging.
+    private void OnChartMouseMove(object sender, ChartMouseNativeEventArgs e)
+    {
+        if (!_isDragging) return;
+
+        var ne = (NativeMouseEventArgs)e;
+        int x = (int)(ne.X / UIScale);
+        int y = (int)(ne.Y / UIScale);
+
+        int newX = Math.Max(0, x - _dragOffsetX);
+        int newY = Math.Max(0, y - _dragOffsetY);
+
+        // Clamp so the panel stays within the chart window.
+        if (CurrentChart?.MainWindow != null)
+        {
+            var clientW = (int)(CurrentChart.MainWindow.ClientRectangle.Width  / UIScale);
+            var clientH = (int)(CurrentChart.MainWindow.ClientRectangle.Height / UIScale);
+            newX = Math.Min(newX, Math.Max(0, clientW - _panelW));
+            newY = Math.Min(newY, Math.Max(0, clientH - HeaderH));
+        }
+
+        XShift    = newX;
+        YShift    = newY;
+        e.Handled = true;
+        LayoutUI();
+        CurrentChart?.RedrawBuffer();
+    }
+
+    // MouseUp: finish the drag.
+    private void OnChartMouseUp(object sender, ChartMouseNativeEventArgs e)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
+            e.Handled   = true;
+        }
+    }
+
+    // MouseClick: toggle checkboxes and handle the Reset button.
+    // The header is handled by drag; clicks that didn't move get here for everything else.
     private void OnChartMouseClick(object sender, ChartMouseNativeEventArgs e)
     {
         var ne = (NativeMouseEventArgs)e;
@@ -349,23 +426,23 @@ public class TradingChecklist : Indicator
         int x = (int)(ne.X / UIScale);
         int y = (int)(ne.Y / UIScale);
 
-        // Reset All button
+        // ── Reset All button ──────────────────────────────────────────────────────
         if (_resetBtnRect.Contains(x, y))
         {
             for (int i = 0; i < 15; i++)
                 _checked[i] = false;
-            SaveCheckedStates(); // Re-enable persistence
+            SaveCheckedStates();
             CurrentChart?.RedrawBuffer();
             return;
         }
 
-        // Toggle items: clicking anywhere on the row (including the checkbox) toggles it.
+        // ── Toggle checklist items ────────────────────────────────────────────────
         for (int i = 0; i < 15; i++)
         {
             if (_itemRects[i] != Rectangle.Empty && _itemRects[i].Contains(x, y))
             {
                 _checked[i] = !_checked[i];
-                SaveCheckedStates(); // Re-enable persistence
+                SaveCheckedStates();
                 CurrentChart?.RedrawBuffer();
                 return;
             }
@@ -400,15 +477,37 @@ public class TradingChecklist : Indicator
 
         // ── Header bar ───────────────────────────────────────────────────────────
         var hdrRect = new Rectangle(X, Y, _panelW, HeaderH);
-        if (!TransparentBackground)
+        if (!TransparentBackground || _isDragging)
         {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
+            // Highlight header while dragging so the user gets clear visual feedback
+            Color hdrColor = _isDragging
+                ? Color.FromArgb(35, 90, 120)   // blue tint = actively dragging
+                : Color.FromArgb(41, 50, 60);
+            using (var br = new SolidBrush(hdrColor))
                 g.FillRectangle(br, hdrRect);
         }
 
         // Divider line under header
         using (var divPen = new Pen(Color.FromArgb(80, 150, 150, 150)))
             g.DrawLine(divPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
+
+        // Drag handle indicator (3 rows × 2 columns of small dots) at the left of the header
+        Color dotColor = _isDragging
+            ? Color.FromArgb(200, 100, 200, 255)  // bright blue while dragging
+            : Color.FromArgb(120, 180, 180, 180);
+        using (var dotBrush = new SolidBrush(dotColor))
+        {
+            const int dotSize = 2;
+            const int dotGap  = 3;
+            int handleX = X + Gutter;
+            int handleY = Y + (HeaderH - (3 * dotSize + 2 * dotGap)) / 2;
+            for (int col = 0; col < 2; col++)
+                for (int row = 0; row < 3; row++)
+                    g.FillEllipse(dotBrush,
+                        handleX + col * (dotSize + dotGap),
+                        handleY + row * (dotSize + dotGap),
+                        dotSize, dotSize);
+        }
 
         // Title text
         using (var titleBrush = new SolidBrush(TitleColor))
@@ -492,8 +591,11 @@ public class TradingChecklist : Indicator
                                          _resetBtnRect.Width, _resetBtnRect.Height);
         using (var path = RoundedRect(resetRectF, BtnRadius))
         {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
-                g.FillPath(br, path);
+            if (!TransparentBackground)
+            {
+                using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
+                    g.FillPath(br, path);
+            }
             using (var pen = new Pen(Color.Gray))
                 g.DrawPath(pen, path);
         }
