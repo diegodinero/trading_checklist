@@ -1,0 +1,6 @@
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.csproj.AssemblyReference.cache
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.AssemblyInfoInputs.cache
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.AssemblyInfo.cs
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.csproj.CoreCompileInputs.cache
+/home/runner/work/trading_checklist/trading_checklist/obj/Debug/TradingChecklist.sourcelink.json
