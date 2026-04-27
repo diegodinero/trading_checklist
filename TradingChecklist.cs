@@ -589,12 +589,15 @@ public class TradingChecklist : Indicator
         // ── Reset All button ─────────────────────────────────────────────────────
         var resetRectF = new RectangleF(_resetBtnRect.X, _resetBtnRect.Y,
                                          _resetBtnRect.Width, _resetBtnRect.Height);
-        using (var path = RoundedRect(resetRectF, BtnRadius))
+        if (!TransparentBackground)
         {
-            using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
-                g.FillPath(br, path);
-            using (var pen = new Pen(Color.Gray))
-                g.DrawPath(pen, path);
+            using (var path = RoundedRect(resetRectF, BtnRadius))
+            {
+                using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
+                    g.FillPath(br, path);
+                using (var pen = new Pen(Color.Gray))
+                    g.DrawPath(pen, path);
+            }
         }
         using (var resetBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
             g.DrawString("Reset All", _resetFont, resetBrush,
