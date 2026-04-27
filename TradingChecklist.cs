@@ -174,6 +174,13 @@ public class TradingChecklist : Indicator
     // ── RUNTIME STATE ────────────────────────────────────────────────────────────
     private readonly bool[] _checked = new bool[15];
 
+    // ── DRAG STATE ───────────────────────────────────────────────────────────────
+    private bool _isDragging;
+    private int _dragStartMouseX;
+    private int _dragStartMouseY;
+    private int _dragStartXShift;
+    private int _dragStartYShift;
+
     // ── CACHED LAYOUT RECTS ──────────────────────────────────────────────────────
     private int _panelW;
     private int _visibleItemCount;
@@ -197,7 +204,12 @@ public class TradingChecklist : Indicator
         LoadCheckedStates(); // Re-enable persistence
         LayoutUI();
         if (CurrentChart != null)
+        {
             CurrentChart.MouseClick += OnChartMouseClick;
+            CurrentChart.MouseDown  += OnChartMouseDown;
+            CurrentChart.MouseMove  += OnChartMouseMove;
+            CurrentChart.MouseUp    += OnChartMouseUp;
+        }
     }
 
     protected override void OnSettingsUpdated()
@@ -211,7 +223,12 @@ public class TradingChecklist : Indicator
     public override void Dispose()
     {
         if (CurrentChart != null)
+        {
             CurrentChart.MouseClick -= OnChartMouseClick;
+            CurrentChart.MouseDown  -= OnChartMouseDown;
+            CurrentChart.MouseMove  -= OnChartMouseMove;
+            CurrentChart.MouseUp    -= OnChartMouseUp;
+        }
 
         // Don't dispose fonts - let GC handle them to avoid refresh issues
         // The fonts are readonly fields and disposing them breaks refresh
@@ -372,6 +389,43 @@ public class TradingChecklist : Indicator
         }
     }
 
+    // ── DRAG HANDLERS ────────────────────────────────────────────────────────────
+    private void OnChartMouseDown(object sender, ChartMouseNativeEventArgs e)
+    {
+        var ne = (NativeMouseEventArgs)e;
+        int x = (int)(ne.X / UIScale);
+        int y = (int)(ne.Y / UIScale);
+
+        var headerRect = new Rectangle(XShift, YShift, _panelW, HeaderH);
+        if (headerRect.Contains(x, y))
+        {
+            _isDragging      = true;
+            _dragStartMouseX = x;
+            _dragStartMouseY = y;
+            _dragStartXShift = XShift;
+            _dragStartYShift = YShift;
+        }
+    }
+
+    private void OnChartMouseMove(object sender, ChartMouseNativeEventArgs e)
+    {
+        if (!_isDragging) return;
+
+        var ne = (NativeMouseEventArgs)e;
+        int x = (int)(ne.X / UIScale);
+        int y = (int)(ne.Y / UIScale);
+
+        XShift = Math.Max(0, _dragStartXShift + (x - _dragStartMouseX));
+        YShift = Math.Max(0, _dragStartYShift + (y - _dragStartMouseY));
+        LayoutUI();
+        CurrentChart?.RedrawBuffer();
+    }
+
+    private void OnChartMouseUp(object sender, ChartMouseNativeEventArgs e)
+    {
+        _isDragging = false;
+    }
+
     // ── PAINT ────────────────────────────────────────────────────────────────────
     public override void OnPaintChart(PaintChartEventArgs args)
     {
@@ -409,6 +463,21 @@ public class TradingChecklist : Indicator
         // Divider line under header
         using (var divPen = new Pen(Color.FromArgb(80, 150, 150, 150)))
             g.DrawLine(divPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
+
+        // Drag handle indicator (3 rows × 2 columns of small dots) at the left of the header
+        using (var dotBrush = new SolidBrush(Color.FromArgb(120, 180, 180, 180)))
+        {
+            const int dotSize = 2;
+            const int dotGap  = 3;
+            int handleX = X + Gutter;
+            int handleY = Y + (HeaderH - (3 * dotSize + 2 * dotGap)) / 2;
+            for (int col = 0; col < 2; col++)
+                for (int row = 0; row < 3; row++)
+                    g.FillEllipse(dotBrush,
+                        handleX + col * (dotSize + dotGap),
+                        handleY + row * (dotSize + dotGap),
+                        dotSize, dotSize);
+        }
 
         // Title text
         using (var titleBrush = new SolidBrush(TitleColor))

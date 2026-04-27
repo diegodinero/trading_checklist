@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "z9cVZYv9EqM=",
+  "success": true,
+  "projectFilePath": "/home/runner/work/trading_checklist/trading_checklist/TradingChecklist.csproj",
+  "expectedPackageFiles": [
+    "/tmp/codeql-scratch-a1d29cdde33911ab/dbs/csharp/working/packages/microsoft.win32.systemevents/9.0.6/microsoft.win32.systemevents.9.0.6.nupkg.sha512",
+    "/tmp/codeql-scratch-a1d29cdde33911ab/dbs/csharp/working/packages/system.drawing.common/9.0.6/system.drawing.common.9.0.6.nupkg.sha512",
+    "/tmp/codeql-scratch-a1d29cdde33911ab/dbs/csharp/working/packages/microsoft.netcore.app.ref/10.0.5/microsoft.netcore.app.ref.10.0.5.nupkg.sha512",
+    "/tmp/codeql-scratch-a1d29cdde33911ab/dbs/csharp/working/packages/microsoft.aspnetcore.app.ref/10.0.5/microsoft.aspnetcore.app.ref.10.0.5.nupkg.sha512"
+  ],
+  "logs": []
+}
