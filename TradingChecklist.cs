@@ -111,14 +111,17 @@ public class TradingChecklist : Indicator
     [InputParameter("Transparent Background", 19)]
     public bool TransparentBackground { get; set; } = false;
 
+    [InputParameter("Background Color", 20)]
+    public Color BackgroundColor { get; set; } = Color.FromArgb(20, 30, 40);
+
     // ── COLOR SETTINGS ───────────────────────────────────────────────────────────
-    [InputParameter("Title Color", 20)]
+    [InputParameter("Title Color", 21)]
     public Color TitleColor { get; set; } = Color.White;
 
-    [InputParameter("Item Text Color", 21)]
+    [InputParameter("Item Text Color", 22)]
     public Color ItemTextColor { get; set; } = Color.White;
 
-    [InputParameter("Checked Color", 22)]
+    [InputParameter("Checked Color", 23)]
     public Color CheckedColor { get; set; } = Color.FromArgb(47, 164, 102);
 
     // ── FONT SETTING (via Settings override) ─────────────────────────────────────
@@ -468,7 +471,7 @@ public class TradingChecklist : Indicator
         {
             if (!TransparentBackground)
             {
-                using (var br = new SolidBrush(Color.FromArgb(20, 30, 40)))
+                using (var br = new SolidBrush(BackgroundColor))
                     g.FillPath(br, path);
             }
             using (var pen = new Pen(Color.Gray))
