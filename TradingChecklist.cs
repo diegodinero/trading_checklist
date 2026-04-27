@@ -124,6 +124,9 @@ public class TradingChecklist : Indicator
     [InputParameter("Checked Color", 23)]
     public Color CheckedColor { get; set; } = Color.FromArgb(47, 164, 102);
 
+    [InputParameter("Accent Color", 24)]
+    public Color AccentColor { get; set; } = Color.FromArgb(41, 50, 60);
+
     // ── FONT SETTING (via Settings override) ─────────────────────────────────────
     public Font ItemFont { get; private set; } = new Font("Segoe UI", 11, FontStyle.Regular);
 
@@ -474,7 +477,7 @@ public class TradingChecklist : Indicator
                 using (var br = new SolidBrush(BackgroundColor))
                     g.FillPath(br, path);
             }
-            using (var pen = new Pen(Color.Gray))
+            using (var pen = new Pen(AccentColor))
                 g.DrawPath(pen, path);
         }
 
@@ -484,14 +487,14 @@ public class TradingChecklist : Indicator
         {
             // Highlight header while dragging so the user gets clear visual feedback
             Color hdrColor = _isDragging
-                ? Color.FromArgb(35, 90, 120)   // blue tint = actively dragging
-                : Color.FromArgb(41, 50, 60);
+                ? Color.FromArgb(Math.Min(255, AccentColor.R + 20), Math.Min(255, AccentColor.G + 40), Math.Min(255, AccentColor.B + 60))
+                : AccentColor;
             using (var br = new SolidBrush(hdrColor))
                 g.FillRectangle(br, hdrRect);
         }
 
         // Divider line under header
-        using (var divPen = new Pen(Color.FromArgb(80, 150, 150, 150)))
+        using (var divPen = new Pen(Color.FromArgb(80, AccentColor.R, AccentColor.G, AccentColor.B)))
             g.DrawLine(divPen, X, Y + HeaderH, X + _panelW, Y + HeaderH);
 
         // Drag handle indicator (3 rows × 2 columns of small dots) at the left of the header
@@ -547,14 +550,14 @@ public class TradingChecklist : Indicator
             }
 
             // Row divider
-            using (var divPen = new Pen(Color.FromArgb(40, 150, 150, 150)))
+            using (var divPen = new Pen(Color.FromArgb(40, AccentColor.R, AccentColor.G, AccentColor.B)))
                 g.DrawLine(divPen, X + Gutter, rowY, X + _panelW - Gutter, rowY);
 
             // Checkbox background
             var cbRect = new Rectangle(X + Gutter, rowY + (ItemH - CheckSize) / 2, CheckSize, CheckSize);
-            using (var cbFill = new SolidBrush(isChecked ? CheckedColor : Color.FromArgb(41, 50, 60)))
+            using (var cbFill = new SolidBrush(isChecked ? CheckedColor : AccentColor))
                 g.FillRectangle(cbFill, cbRect);
-            using (var cbPen = new Pen(isChecked ? CheckedColor : Color.Gray))
+            using (var cbPen = new Pen(isChecked ? CheckedColor : AccentColor))
                 g.DrawRectangle(cbPen, cbRect);
 
             // Checkmark (✓) when checked
@@ -596,10 +599,10 @@ public class TradingChecklist : Indicator
         {
             if (!TransparentBackground)
             {
-                using (var br = new SolidBrush(Color.FromArgb(41, 50, 60)))
+                using (var br = new SolidBrush(AccentColor))
                     g.FillPath(br, path);
             }
-            using (var pen = new Pen(Color.Gray))
+            using (var pen = new Pen(AccentColor))
                 g.DrawPath(pen, path);
         }
         using (var resetBrush = new SolidBrush(Color.FromArgb(184, 205, 228)))
