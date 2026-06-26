@@ -1,2 +1,2 @@
 # trading_checklist
-Checklist to ensure rules are being followed before entering a trad
+Checklist to ensure rules are being followed before entering a trade
